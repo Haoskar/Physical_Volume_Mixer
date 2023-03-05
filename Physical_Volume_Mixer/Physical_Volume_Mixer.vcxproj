@@ -141,6 +141,10 @@
   <ItemGroup>
     <None Include="arduino\Rotary_encoder\Rotary_encoder.ino" />
     <None Include="arduino\sketch_nov5a\sketch_nov5a.ino" />
+    <None Include="include\libserialport.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="include\libserialport.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

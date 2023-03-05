@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Physical_Volume_Mixer/libserialport.h
+/Physical_Volume_Mixer/include/libserialport.lib
+/Physical_Volume_Mixer/include/libserialport.dll
+/Physical_Volume_Mixer/libserialport.h
+/Physical_Volume_Mixer/libserialport.h
+/Physical_Volume_Mixer/libserialport.h
+/Physical_Volume_Mixer/include/libserialport.dll
+/Physical_Volume_Mixer/include/libserialport.lib

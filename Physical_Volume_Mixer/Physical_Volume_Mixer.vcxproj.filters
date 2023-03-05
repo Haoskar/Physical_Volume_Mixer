@@ -40,5 +40,9 @@
     <None Include="arduino\Rotary_encoder\Rotary_encoder.ino">
       <Filter>arduino</Filter>
     </None>
+    <None Include="include\libserialport.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="include\libserialport.lib" />
   </ItemGroup>
 </Project>
