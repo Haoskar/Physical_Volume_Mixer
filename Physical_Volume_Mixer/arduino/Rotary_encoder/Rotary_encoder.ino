@@ -25,14 +25,17 @@ void loop() {
       bCW = false;
       encoderPosCount--;
       }
-    Serial.print ("Rotated: ");
-    if (bCW){
+    delay(6);
+    //Serial.print ("Rotated: ");
+    /*if (bCW){
       Serial.println ("clockwise");
     }else{
       Serial.println("counterclockwise");
-    }
-      Serial.print("Encoder Position: ");
-      Serial.println(encoderPosCount);
+    }*/
+    Serial.print("20,");
+    Serial.println(bCW);
+      //Serial.print("Encoder Position: ");
+      //Serial.println(encoderPosCount);
   }
   pinALast = aVal;
 }

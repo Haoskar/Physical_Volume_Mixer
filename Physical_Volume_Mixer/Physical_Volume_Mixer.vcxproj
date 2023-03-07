@@ -135,7 +135,7 @@
     <ClCompile Include="TestVolume_c++.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="libserialport.h" />
+    <ClInclude Include="include\libserialport.h" />
     <ClInclude Include="ProgramVolume.h" />
   </ItemGroup>
   <ItemGroup>

@@ -220,27 +220,51 @@ int main()
 		int result = check(sp_blocking_read(ports[0], buf, 6, timeout));
 		buf[result] = '\0';
 		masterbuf.append(buf);
-		float vol = 0;
+		int rotCW = -1;
+		int index = -1;
+
 
 		while (true) {
 			int searched_index = masterbuf.find("\n");
 			if (searched_index != -1) {
 				std::string usbmessage = masterbuf.substr(0, searched_index);
 				masterbuf = masterbuf.erase(0, searched_index+1);
-				
-				vol = atof(usbmessage.substr(2, 5).c_str());
-				vol = vol / 100;
 
-				if (usbmessage[0] == '0') {
+				std::cout << usbmessage << "\n";
+
+				int comsplit = usbmessage.find(",");
+				if (comsplit != -1) {
+					index = stoi(usbmessage.substr(0, comsplit));
+					rotCW = stoi(usbmessage.substr(comsplit + 1, std::string::npos));
+				}
+
+				if (index < 0 || rotCW < 0) {
+					std::cout << "SOMETHING IS WRONG INDEX: " << index << " rotCW: " << rotCW;
+				}
+
+
+
+				if (index == 0) {
+					float vol = 0;
+					pAudioEndpointVolume->GetMasterVolumeLevelScalar(&vol);
+					if (rotCW)
+						vol = vol + 0.01 < 100 ? vol + 0.01 : vol;
+					else
+						vol = vol - 0.01 < 100 ? vol - 0.01 : vol;
 					pAudioEndpointVolume->SetMasterVolumeLevelScalar(vol, NULL);
 				}
 				else {
-					int usb_index_sak = atoi(&usbmessage[0]);
-					usb_index_sak--;
+					index--;
 					
 					mtx.lock();
-					if (usb_index_sak < volumeVector.size()) {
-						volumeVector.at(usb_index_sak).setVolume(vol);
+					if (index < volumeVector.size()) {
+						float vol = 0;
+						vol = volumeVector.at(index).getVolume();
+						if (rotCW)
+							vol = vol + 0.01 < 100 ? vol + 0.01 : vol;
+						else
+							vol = vol - 0.01 < 100 ? vol - 0.01 : vol;
+						volumeVector.at(index).setVolume(vol);
 					}
 					mtx.unlock();
 				}
