@@ -1,60 +1,81 @@
-int pinA_1 = 13; // Connected to CLK Grön
-int pinB_1 = 12; // Connected to DT  Gul
+#include <LiquidCrystal.h> 
+
+#define ARRAY_SIZE 10
+
+int pinA_1 = 30; // Connected to CLK Grön
+int pinB_1 = 31; // Connected to DT  Gul
 //int encoderPosCount = 0;
 int pinALast_1;
 //int aVal;
 
 
-int pinA_2 = 10; // Connected to CLK Grön
-int pinB_2 = 9; // Connected to DT  Gul
+int pinA_2 = 32; // Connected to CLK Grön
+int pinB_2 = 33; // Connected to DT  Gul
 int pinALast_2;
 
-int pinA_3 = 7; // Connected to CLK Grön
-int pinB_3 = 6; // Connected to DT  Gul
+int pinA_3 = 34; // Connected to CLK Grön
+int pinB_3 = 35; // Connected to DT  Gul
 int pinALast_3;
 
 
-//This is to move the array index it sends to the right on the number line ex: pot_arr_offset + i
-int button_right = 12;
+//This is to move the array index it sends to the right on the number line ex: array_offset + i
+int button_right = 22;
 int button_right_val = 0;
 int button_right_prev_val = -1;
 
-//This is to move the array index it sends to the left on the number line ex: pot_arr_offset + i
-int button_left = 10;
+//This is to move the array index it sends to the left on the number line ex: array_offset + i
+int button_left = 24;
 int button_left_val = 0;
 int button_left_prev_val = -1;
 
 unsigned long button_left_lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long button_right_lastDebounceTime = 0;  // the last time the output pin was toggled
 
-unsigned long debounceDelay = 500;    // the debounce time; increase if the output flickers
+const unsigned long debounceDelay = 800;    // the debounce time; increase if the output flickers
 
-int pot_arr_offset = 0;
+int array_offset = 0;
 
+const int RS = 4, EN = 5, D4 = 10, D5 = 11, D6 = 12, D7 = 13;
+LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
+
+
+String programs[100]; 
+int programsSize = 0;
+
+int displayIndex = 0; //This is what array_offset is displayed right now
+int oldProgramSize = 0;
 
 void setup() {
-pinMode (pinA_1,INPUT);
-pinMode (pinB_1,INPUT);
+  pinMode (pinA_1,INPUT);
+  pinMode (pinB_1,INPUT);
 
-pinMode (pinA_2,INPUT);
-pinMode (pinB_2,INPUT);
+  pinMode (pinA_2,INPUT);
+  pinMode (pinB_2,INPUT);
 
-pinMode (pinA_3,INPUT);
-pinMode (pinB_3,INPUT);
+  pinMode (pinA_3,INPUT);
+  pinMode (pinB_3,INPUT);
 
-pinMode(button_right, INPUT);
-pinMode(button_left, INPUT);
+  pinMode(button_right, INPUT);
+  pinMode(button_left, INPUT);
 
-/* Read Pin A
-Whatever state it's in will reflect the last position
-*/
-pinALast_1 = digitalRead(pinA_1);
-pinALast_2 = digitalRead(pinA_2);
-pinALast_2 = digitalRead(pinA_3);
-Serial.begin (9600);
+  /* Read Pin A
+  Whatever state it's in will reflect the last position
+  */
+  pinALast_1 = digitalRead(pinA_1);
+  pinALast_2 = digitalRead(pinA_2);
+  pinALast_2 = digitalRead(pinA_3);
+  Serial.begin (9600);
+
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("Hello World!");
+  lcd.setCursor(0, 1); 
+  lcd.print("Oskar");
+
+  Serial.println("STARTING");
 }
 
-void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index){
+void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index, int offset){
   boolean bCW;
   int aVal = digitalRead(pinA);
   if(aVal != *pinALast){
@@ -68,7 +89,7 @@ void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index){
     }
 
     Serial.print("Index: ");
-    Serial.print(index);
+    Serial.print(index + offset);
     Serial.print(" Clockwise: ");
     Serial.println(bCW ? "True" : "False");
 
@@ -77,18 +98,59 @@ void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index){
   *pinALast = aVal;
 }
 
+void displayTextOnLCD(){
+  //do not update unless something has changed!
+  if(displayIndex == array_offset && programsSize == oldProgramSize)
+    return;
+  //something changed updating
+  lcd.clear();
+  for(int i = 0; i < 2; i++){
+    lcd.setCursor(0, i);
+    displayIndex = array_offset;
+    oldProgramSize = programsSize;
+    if(i + array_offset >= programsSize || i + array_offset < 0){
+      lcd.print("NOTHING");
+    }
+    else{
+      lcd.print(programs[i + array_offset]);      
+    }
+  }
+}
+
 void loop(){
 
-    button_left_val = digitalRead(button_left);
+  if(Serial.available() > 0){
+    String a = Serial.readString();
+
+    programsSize = 0;
+    int ssIndex = -1;
+    while((ssIndex = a.indexOf(',')) != -1){
+      programs[programsSize] = a.substring(0,ssIndex);
+      programsSize++;
+      a.remove(0,ssIndex+1);  
+      Serial.println(a);    
+    }
+
+    a.replace("\n","\0");
+    programs[programsSize] = a;
+    programsSize++;
+    //lcd.setCursor(0, 0);
+    //lcd.clear();
+    //lcd.print(programs[0]);
+  }
+
+  displayTextOnLCD();
+
+  button_left_val = digitalRead(button_left);
   if(button_left_val != button_left_prev_val && (button_left_lastDebounceTime - millis()) > debounceDelay)
   {
     button_left_prev_val = button_left_val;
-    if(pot_arr_offset <= 0){
-      //Serial.println("Can't switch left!");
+    if(array_offset <= 0){
+      Serial.println("Can't switch left!");
     }else{
-      //Serial.println("Switching left");
-      pot_arr_offset--;
-      //Serial.println(pot_arr_offset);
+      Serial.print("Switching left: ");
+      array_offset--;
+      Serial.println(array_offset);
     }
     
   }
@@ -97,21 +159,21 @@ void loop(){
   if(button_right_val != button_right_prev_val && (button_right_lastDebounceTime - millis()) > debounceDelay)
   {
     button_right_prev_val = button_right_val;
-    if(pot_arr_offset > NUM_POT_PREV_VAL - POT_PORTS - 1){
-      //Serial.println("Can't switch right!");
+    if(array_offset > ARRAY_SIZE){
+      Serial.println("Can't switch right!");
     }else{
-      //Serial.print("Switching right: ");
-      pot_arr_offset++;
-      //Serial.println(pot_arr_offset + 2);
+      Serial.print("Switching right: ");
+      array_offset++;
+      Serial.println(array_offset);
       
     }
     
   }
 
 
-  rotary_encoder_read(pinA_1, pinB_1, &pinALast_1, 0);
-  rotary_encoder_read(pinA_2, pinB_2, &pinALast_2, 1);
-  rotary_encoder_read(pinA_3, pinB_3, &pinALast_3, 2);
+  rotary_encoder_read(pinA_1, pinB_1, &pinALast_1, 0, 0);
+  rotary_encoder_read(pinA_2, pinB_2, &pinALast_2, 1, array_offset);
+  rotary_encoder_read(pinA_3, pinB_3, &pinALast_3, 2, array_offset);
 }
 
 /*
