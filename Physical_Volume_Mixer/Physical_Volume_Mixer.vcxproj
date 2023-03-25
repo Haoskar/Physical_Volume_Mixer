@@ -90,12 +90,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\Oskar\source\repos\Physical_Volume_Mixer\Physical_Volume_Mixer\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Users\Oskar\source\repos\Physical_Volume_Mixer\Physical_Volume_Mixer\include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libserialport.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -122,21 +125,20 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\Oskar\source\repos\Physical_Volume_Mixer\Physical_Volume_Mixer\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Users\Oskar\source\repos\Physical_Volume_Mixer\Physical_Volume_Mixer\include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libserialport.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ProgramVolume.cpp" />
     <ClCompile Include="TestVolume_c++.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="include\libserialport.h" />
-    <ClInclude Include="ProgramVolume.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="arduino\Rotary_encoder\Rotary_encoder.ino" />
@@ -145,6 +147,10 @@
   </ItemGroup>
   <ItemGroup>
     <Library Include="include\libserialport.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\libserialport.h" />
+    <ClInclude Include="include\ProgramVolume.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

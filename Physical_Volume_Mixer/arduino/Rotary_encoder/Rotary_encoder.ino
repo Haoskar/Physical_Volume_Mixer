@@ -72,7 +72,7 @@ void setup() {
   lcd.setCursor(0, 1); 
   lcd.print("Oskar");
 
-  Serial.println("STARTING");
+  //Serial.println("STARTING");
 }
 
 void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index, int offset){
@@ -88,10 +88,12 @@ void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index, int offse
       bCW = false;      
     }
 
-    Serial.print("Index: ");
+    //Serial.print("Index: ");
     Serial.print(index + offset);
-    Serial.print(" Clockwise: ");
-    Serial.println(bCW ? "True" : "False");
+    //Serial.print(" Clockwise: ");
+    //Serial.println(bCW ? "True" : "False");
+    Serial.print(",");
+    Serial.println(bCW);
 
     delay(6);
   }
@@ -118,27 +120,31 @@ void displayTextOnLCD(){
 }
 
 void loop(){
+  
+  
+  while(Serial.available() > 0){
+    String a = Serial.readStringUntil('\n');
 
-  if(Serial.available() > 0){
-    String a = Serial.readString();
-
-    programsSize = 0;
-    int ssIndex = -1;
-    while((ssIndex = a.indexOf(',')) != -1){
-      programs[programsSize] = a.substring(0,ssIndex);
-      programsSize++;
-      a.remove(0,ssIndex+1);  
-      Serial.println(a);    
+    if(a.compareTo(String("s")) == 0){
+      programsSize = 0;
+      continue;
     }
-
-    a.replace("\n","\0");
+    else if(a.compareTo(String("e")) == 0){
+      break;
+    }    
     programs[programsSize] = a;
     programsSize++;
-    //lcd.setCursor(0, 0);
-    //lcd.clear();
-    //lcd.print(programs[0]);
   }
+  
 
+  /*if(programsSize > 0){
+    lcd.setCursor(0, 0);
+    lcd.print(programs[0]);
+    lcd.setCursor(0, 1);
+    lcd.print(programs[  (programsSize <= 0 ? 0 : programsSize-1)   ]);
+    lcd.setCursor(12, 1);
+    lcd.print(programsSize);
+  }*/
   displayTextOnLCD();
 
   button_left_val = digitalRead(button_left);
@@ -146,11 +152,11 @@ void loop(){
   {
     button_left_prev_val = button_left_val;
     if(array_offset <= 0){
-      Serial.println("Can't switch left!");
+      //Serial.println("Can't switch left!");
     }else{
-      Serial.print("Switching left: ");
+      //Serial.print("Switching left: ");
       array_offset--;
-      Serial.println(array_offset);
+      //Serial.println(array_offset);
     }
     
   }
@@ -160,11 +166,11 @@ void loop(){
   {
     button_right_prev_val = button_right_val;
     if(array_offset > ARRAY_SIZE){
-      Serial.println("Can't switch right!");
+      //Serial.println("Can't switch right!");
     }else{
-      Serial.print("Switching right: ");
+      //Serial.print("Switching right: ");
       array_offset++;
-      Serial.println(array_offset);
+      //Serial.println(array_offset);
       
     }
     

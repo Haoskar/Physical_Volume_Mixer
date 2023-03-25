@@ -26,14 +26,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ProgramVolume.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\libserialport.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="arduino\sketch_nov5a\sketch_nov5a.ino">
       <Filter>arduino</Filter>
     </None>
@@ -44,5 +36,13 @@
   </ItemGroup>
   <ItemGroup>
     <Library Include="include\libserialport.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\ProgramVolume.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\libserialport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

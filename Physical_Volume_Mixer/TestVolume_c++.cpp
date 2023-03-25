@@ -16,6 +16,7 @@
 #include <mutex>
 #include <string>
 #include <libserialport.h>
+#include <cstring>
 
 #include "ProgramVolume.h"
 
@@ -50,6 +51,8 @@ IAudioClient* pAudioClient = NULL;
 IAudioSessionManager* pAudioSessionManager = NULL;
 IAudioSessionManager2* pAudioSessionManager2 = NULL;
 IAudioEndpointVolume* pAudioEndpointVolume = NULL;
+
+struct sp_port *tx_port;
 
 void updater()
 {
@@ -176,6 +179,40 @@ void updater()
 
 		}
 
+		
+		char cprogname[50] = "";
+		size_t ksjdflaksdjflkdjsf = 20;
+		std::cout << "\n\nSending DATA \n\n";
+		char start[] = "s\n";
+		std::cout << "Start: " << check(sp_blocking_write(tx_port, start, std::strlen(start), 0)) << "\n\n";
+		for (size_t j = 0; j < volumeVector.size(); ++j) {
+			std::string data_send;
+			if (wcstombs_s(&ksjdflaksdjflkdjsf, cprogname, (size_t) 50, volumeVector.at(j).progName, 50) == EINVAL) {
+				std::cout << "ERROR CAN'T COPY\n";
+			}
+			//data_send.append("+,");
+			data_send.append(cprogname);
+			data_send.append("\n");
+			std::cout << "Size: " << data_send.size() << " " << data_send.size() << " Data send: \"" << data_send.c_str() << "\"\n";
+			std::cout << "Bytes: " << check(sp_blocking_write(tx_port, data_send.c_str(), std::strlen(data_send.c_str()), 0)) << "\n";
+		}
+		char end[] = "e\n";
+		std::cout << "End: " << check(sp_blocking_write(tx_port, end, std::strlen(end), 0)) << "\n\n";
+		/*if (wcstombs_s(&ksjdflaksdjflkdjsf, cprogname, (size_t)50, volumeVector.at(volumeVector.size() - 1).progName, 50) == EINVAL) {
+			std::cout << "ERROR CAN'T COPY\n";
+		}
+		data_send.append(cprogname);
+		data_send.append("\n");*/
+		
+		//std::cout << "Size: " << data_send.size() << " " << data_send.size() << " Data send: \"" << data_send.c_str() << "\"\n";
+
+		//std::cout << "Bytes: " << check(sp_blocking_write(tx_port, data_send.c_str(), std::strlen(data_send.c_str()), 0)) << "\n";
+		//const char *buf = "HEJnnjnnnnn\n";
+		//std::cout << "Bytes: " << check(sp_blocking_write(tx_port, buf, std::strlen(buf), 0)) << "\n";
+		//std::cout << "Size: " << std::strlen(buf) << " Data send: \"" << buf << "\"\n";
+		//check(sp_drain(tx_port));
+		//check(sp_flush(tx_port, SP_BUF_OUTPUT));
+		//std::cout << check(sp_output_waiting(tx_port)) << "\n";
 		mtx.unlock();
 
 
@@ -190,34 +227,37 @@ void updater()
 
 int main()
 {
-
-
 	HRESULT hr = S_OK;
 
+	sp_port* ports;
 
+	check(sp_get_port_by_name("COM3", &ports));
+	check(sp_open(ports, SP_MODE_READ_WRITE));
 
-	std::thread(updater).detach();
+	check(sp_set_baudrate(ports, 9600));
+	check(sp_set_bits(ports, 8));
+	check(sp_set_parity(ports, SP_PARITY_NONE));
+	check(sp_set_stopbits(ports, 1));
+	check(sp_set_flowcontrol(ports, SP_FLOWCONTROL_NONE));
 
-	sp_port* ports[1];
-
-	check(sp_get_port_by_name("COM3", ports));
-	check(sp_open(ports[0], SP_MODE_READ_WRITE));
-
-	check(sp_set_baudrate(ports[0], 9600));
-	check(sp_set_bits(ports[0], 8));
-	check(sp_set_parity(ports[0], SP_PARITY_NONE));
-	check(sp_set_stopbits(ports[0], 1));
-	check(sp_set_flowcontrol(ports[0], SP_FLOWCONTROL_NONE));
 
 	char* buf = (char*)malloc(20);
 	unsigned int timeout = 0;
 
-	sp_flush(ports[0], SP_BUF_BOTH);
+	sp_flush(ports, SP_BUF_BOTH);
+
+
+	tx_port = ports;
+	struct sp_port *rx_port = ports;
+
+	std::thread(updater).detach();
+
+
 	std::string masterbuf("");
 	while (true)
 	{
 
-		int result = check(sp_blocking_read(ports[0], buf, 6, timeout));
+		int result = check(sp_blocking_read(rx_port, buf, 6, timeout));
 		buf[result] = '\0';
 		masterbuf.append(buf);
 		int rotCW = -1;
@@ -281,7 +321,7 @@ int main()
 	//Clean up----------------------------------------------------------------------------
 	free(buf);
 
-	sp_free_port(ports[0]);
+	sp_free_port(ports);
 
 	SAFE_RELEASE(pAudioEndPoint);
 	SAFE_RELEASE(pAudioClient);
