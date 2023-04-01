@@ -15,9 +15,10 @@
 #include <thread>
 #include <mutex>
 #include <string>
-#include <libserialport.h>
 #include <cstring>
 
+
+#include "libserialport.h"
 #include "ProgramVolume.h"
 
 std::mutex mtx;
@@ -63,8 +64,8 @@ void updater()
 	IAudioSessionControl2* pAudioSessionControl2 = NULL;
 
 	//TEMP--------------------------------------------------------------------
-	TCHAR* test = NULL;
-	TCHAR dasdafa[2048];
+	wchar_t* test = NULL;
+	wchar_t dasdafa[2048];
 	DWORD dasSize = 2048;
 
 	DWORD processId = 0;
@@ -112,8 +113,8 @@ void updater()
 		PRINT_ON_ERROR(hr)
 
 		
-			int tempcount = 0;
-		hr = pAudioSessionEnumerator->GetCount(&tempcount);
+        int tempcount = 0;
+        hr = pAudioSessionEnumerator->GetCount(&tempcount);
 		PRINT_ON_ERROR(hr)
 
 
@@ -132,13 +133,13 @@ void updater()
 				hr = pAudioSessionControl2->GetProcessId(&processId);
 				PRINT_ON_ERROR(hr);
 
-				if (GetProcessImageFileName(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId), dasdafa, dasSize) != 0) {
+				if (GetProcessImageFileNameW(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId), dasdafa, dasSize) != 0) {
 
 					test = wcsrchr(dasdafa, L'.');
 					*test = L'\0';
 
 					test = wcsrchr(dasdafa, L'\\') + 1;
-					StringCbCopy(tempVolumeVector.at(i).progName, tempVolumeVector.at(i).progNameSize, test);
+					StringCbCopyW(tempVolumeVector.at(i).progName, tempVolumeVector.at(i).progNameSize, test);
 				}
 
 				SAFE_RELEASE(pAudioSessionControl);
@@ -231,7 +232,7 @@ int main()
 
 	sp_port* ports;
 
-	check(sp_get_port_by_name("COM3", &ports));
+	check(sp_get_port_by_name("COM4", &ports));
 	check(sp_open(ports, SP_MODE_READ_WRITE));
 
 	check(sp_set_baudrate(ports, 9600));
