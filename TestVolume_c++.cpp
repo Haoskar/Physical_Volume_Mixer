@@ -1,6 +1,7 @@
 // TestVolume_c++.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#include <combaseapi.h>
 #include <iostream>
 #include <mmdeviceapi.h>
 #include <Audioclient.h>
@@ -9,8 +10,10 @@
 #include <AudioSessionTypes.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <Audiopolicy.h>
+#include <objbase.h>
 #include <strsafe.h>
 #include <Psapi.h>
+#include <unknwnbase.h>
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -53,31 +56,269 @@ IAudioSessionManager* pAudioSessionManager = NULL;
 IAudioSessionManager2* pAudioSessionManager2 = NULL;
 IAudioEndpointVolume* pAudioEndpointVolume = NULL;
 
-struct sp_port *tx_port;
-
-void updater()
+class AudioNotifications: public IAudioSessionNotification
 {
+
+private:
+
+        LONG             m_cRefAll;
+        ~AudioNotifications(){};
+
+public:
+    AudioNotifications(): m_cRefAll(1) {};
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppv)  
+    {    
+        if (IID_IUnknown == riid)
+        {
+            AddRef();
+            *ppv = (IUnknown*)this;
+        }
+        else if (__uuidof(IAudioSessionNotification) == riid)
+        {
+            AddRef();
+            *ppv = (IAudioSessionNotification*)this;
+        }
+        else
+        {
+            *ppv = NULL;
+            return E_NOINTERFACE;
+        }
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef(){
+        return InterlockedIncrement(&m_cRefAll);
+    }
+     
+    ULONG STDMETHODCALLTYPE Release(){
+        ULONG ulRef = InterlockedDecrement(&m_cRefAll);
+        if (0 == ulRef)
+        {
+			std::cout << "\n\nI am delete godbye\n";
+            delete this;
+        }
+        return ulRef;
+    }
+
+    HRESULT OnSessionCreated(IAudioSessionControl *pNewSession){
+        std::cout << "\n\n I AM IN THE OnSessionCreated\n";
+        HRESULT hr = S_OK;
+
+        ISimpleAudioVolume* pSimpleAudio = NULL;
+
+        hr = pNewSession->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&pSimpleAudio);
+        PRINT_ON_ERROR(hr);
+
+        wchar_t *dispName;
+        pNewSession->GetDisplayName(&dispName);
+		std::cout << "I am: " << pNewSession << "\n";
+        std::wcout << "Name: " << dispName;
+        float vol = -1;
+        pSimpleAudio->GetMasterVolume(&vol);
+        std::cout << "\nVolume: " << vol << "\n\n";
+
+
+        //SAFE_RELEASE(pNewSession);
+        SAFE_RELEASE(pSimpleAudio);
+
+        return S_OK;
+    }
+};
+
+//-----------------------------------------------------------
+// Client implementation of IAudioSessionEvents interface.
+// WASAPI calls these methods to notify the application when
+// a parameter or property of the audio session changes.
+//-----------------------------------------------------------
+class CAudioSessionEvents : public IAudioSessionEvents
+{
+private:
+	LONG _cRef;
+
+	~CAudioSessionEvents()
+	{
+	}
+
+public:
+	CAudioSessionEvents() :
+		_cRef(1)
+	{
+	}
+
+	// IUnknown methods -- AddRef, Release, and QueryInterface
+
+	ULONG STDMETHODCALLTYPE AddRef()
+	{
+		return InterlockedIncrement(&_cRef);
+	}
+
+	ULONG STDMETHODCALLTYPE Release()
+	{
+		ULONG ulRef = InterlockedDecrement(&_cRef);
+		if (0 == ulRef)
+		{
+			delete this;
+		}
+		return ulRef;
+	}
+
+	HRESULT STDMETHODCALLTYPE QueryInterface(
+		REFIID  riid,
+		VOID** ppvInterface)
+	{
+		if (IID_IUnknown == riid)
+		{
+			AddRef();
+			*ppvInterface = (IUnknown*)this;
+		}
+		else if (__uuidof(IAudioSessionEvents) == riid)
+		{
+			AddRef();
+			*ppvInterface = (IAudioSessionEvents*)this;
+		}
+		else
+		{
+			*ppvInterface = NULL;
+			return E_NOINTERFACE;
+		}
+		return S_OK;
+	}
+
+	// Notification methods for audio session events
+
+	HRESULT STDMETHODCALLTYPE OnDisplayNameChanged(
+		LPCWSTR NewDisplayName,
+		LPCGUID EventContext)
+	{
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnIconPathChanged(
+		LPCWSTR NewIconPath,
+		LPCGUID EventContext)
+	{
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnSimpleVolumeChanged(
+		float NewVolume,
+		BOOL NewMute,
+		LPCGUID EventContext)
+	{
+		if (NewMute)
+		{
+			printf("MUTE\n");
+		}
+		else
+		{
+			printf("Volume = %d percent\n",
+				(UINT32)(100 * NewVolume + 0.5));
+		}
+
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnChannelVolumeChanged(
+		DWORD ChannelCount,
+		float NewChannelVolumeArray[],
+		DWORD ChangedChannel,
+		LPCGUID EventContext)
+	{
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnGroupingParamChanged(
+		LPCGUID NewGroupingParam,
+		LPCGUID EventContext)
+	{
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnStateChanged(
+		AudioSessionState NewState)
+	{
+        std::string pszState = "?????";
+
+		switch (NewState)
+		{
+		case AudioSessionStateActive:
+			pszState = "active";
+			break;
+		case AudioSessionStateInactive:
+			pszState = "inactive";
+			break;
+		}
+		printf("New session state = %s\n", pszState.c_str());
+
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnSessionDisconnected(
+		AudioSessionDisconnectReason DisconnectReason)
+	{
+        std::string pszReason = "?????";
+
+		switch (DisconnectReason)
+		{
+		case DisconnectReasonDeviceRemoval:
+			pszReason = "device removed";
+			break;
+		case DisconnectReasonServerShutdown:
+			pszReason = "server shut down";
+			break;
+		case DisconnectReasonFormatChanged:
+			pszReason = "format changed";
+			break;
+		case DisconnectReasonSessionLogoff:
+			pszReason = "user logged off";
+			break;
+		case DisconnectReasonSessionDisconnected:
+			pszReason = "session disconnected";
+			break;
+		case DisconnectReasonExclusiveModeOverride:
+			pszReason = "exclusive-mode override";
+			break;
+		}
+		printf("Audio session disconnected (reason: %s)\n",
+			pszReason.c_str());
+
+		return S_OK;
+	}
+};
+
+int main()
+{
+	HRESULT hr = S_OK;
+/*
+	sp_port* ports;
+
+	check(sp_get_port_by_name("COM4", &ports));
+	check(sp_open(ports, SP_MODE_READ_WRITE));
+
+	check(sp_set_baudrate(ports, 9600));
+	check(sp_set_bits(ports, 8));
+	check(sp_set_parity(ports, SP_PARITY_NONE));
+	check(sp_set_stopbits(ports, 1));
+	check(sp_set_flowcontrol(ports, SP_FLOWCONTROL_NONE));
+
+
+	char* buf = (char*)malloc(20);
+	unsigned int timeout = 0;
+
+	sp_flush(ports, SP_BUF_BOTH);
+
+    struct sp_port *rx_port = ports;
+    struct sp_port *tx_port;
+*/
+    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	PRINT_ON_ERROR(hr);
 
 	ISimpleAudioVolume* pSimpleAudio = NULL;
 	IAudioSessionEnumerator* pAudioSessionEnumerator = NULL;
 	IAudioSessionControl* pAudioSessionControl = NULL;
 	IAudioSessionControl2* pAudioSessionControl2 = NULL;
 
-	//TEMP--------------------------------------------------------------------
-	wchar_t* test = NULL;
-	wchar_t dasdafa[2048];
-	DWORD dasSize = 2048;
-
-	DWORD processId = 0;
-	float volume = 0;
-	HRESULT hr = S_OK;
-	//TEMP--------------------------------------------------------------------
-
-
-	std::vector<ProgramVolume> tempVolumeVector;
-
-	int r = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-
+    
 	hr = getDefaultAudioEndPointDevice(&pAudioEndPoint);
 	PRINT_ON_ERROR(hr);
 	//EXIT_ON_ERROR(hr);
@@ -105,165 +346,60 @@ void updater()
 		(void**)&pAudioEndpointVolume
 	);
 
+    std::cout << "Initialized all the things\n";
 
-	while (TRUE)
-	{
+    
+    AudioNotifications *notifying = new AudioNotifications();
 
-		hr = pAudioSessionManager2->GetSessionEnumerator(&pAudioSessionEnumerator);
-		PRINT_ON_ERROR(hr)
+	//IAudioSessionNotification *pAudioSessionNotification = NULL;
+	//notifying->QueryInterface(__uuidof(IAudioSessionNotification), (void **) & pAudioSessionNotification);
 
-		
-        int tempcount = 0;
-        hr = pAudioSessionEnumerator->GetCount(&tempcount);
-		PRINT_ON_ERROR(hr)
+    hr = pAudioSessionManager2->RegisterSessionNotification(notifying);
+	PRINT_ON_ERROR(hr);
 
+    hr = pAudioSessionManager2->GetSessionEnumerator(&pAudioSessionEnumerator);
+	PRINT_ON_ERROR(hr);
 
-			for (int i = 0; i < tempcount; i++) {
-				hr = pAudioSessionEnumerator->GetSession(i, &pAudioSessionControl);
-				PRINT_ON_ERROR(hr);
+    int tempcount = 0;
+    hr = pAudioSessionEnumerator->GetCount(&tempcount);
+    PRINT_ON_ERROR(hr)
 
-				hr = pAudioSessionControl->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&pSimpleAudio);
-				PRINT_ON_ERROR(hr);
+    std::cout << "called the functions\n";
+    CAudioSessionEvents *audiosess = new CAudioSessionEvents();
+    pAudioSessionControl->RegisterAudioSessionNotification(audiosess);
 
-				tempVolumeVector.push_back(ProgramVolume(pSimpleAudio));
+    for (int i = 0; i < tempcount; i++) {
+        hr = pAudioSessionEnumerator->GetSession(i, &pAudioSessionControl);
+        PRINT_ON_ERROR(hr);
 
+        hr = pAudioSessionControl->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&pSimpleAudio);
+        PRINT_ON_ERROR(hr);
 
-				hr = pAudioSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pAudioSessionControl2);
-				PRINT_ON_ERROR(hr);
-				hr = pAudioSessionControl2->GetProcessId(&processId);
-				PRINT_ON_ERROR(hr);
-
-				if (GetProcessImageFileNameW(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId), dasdafa, dasSize) != 0) {
-
-					test = wcsrchr(dasdafa, L'.');
-					*test = L'\0';
-
-					test = wcsrchr(dasdafa, L'\\') + 1;
-					StringCbCopyW(tempVolumeVector.at(i).progName, tempVolumeVector.at(i).progNameSize, test);
-				}
-
-				SAFE_RELEASE(pAudioSessionControl);
-				SAFE_RELEASE(pAudioSessionControl2);
-
-			}
-
-		mtx.lock();
-		for (size_t j = 0; j < volumeVector.size(); j++)
-		{
-			BOOL audioDeviceExist = FALSE;
-			for (size_t i = 0; i < tempVolumeVector.size(); i++)
-			{
-				if (volumeVector.at(j).pSimpleAudio == tempVolumeVector.at(i).pSimpleAudio)
-					audioDeviceExist = TRUE;
-			}
-			if (!audioDeviceExist)
-			{
-				SAFE_RELEASE(volumeVector.at(j).pSimpleAudio);
-				volumeVector.erase(std::next(volumeVector.begin(), j));
-
-			}
-		}
-
-		for (size_t j = 0; j < tempVolumeVector.size(); j++)
-		{
-			BOOL audioDeviceExist = FALSE;
-			for (size_t i = 0; i < volumeVector.size(); i++)
-			{
-				if (tempVolumeVector.at(j).pSimpleAudio == volumeVector.at(i).pSimpleAudio)
-					audioDeviceExist = TRUE;
-			}
-			if (!audioDeviceExist)
-			{
-				ProgramVolume tempPVol(tempVolumeVector.at(j));
-				volumeVector.push_back((tempPVol));
-			}
-
-		}
+        wchar_t *dispName;
+        pAudioSessionControl->GetDisplayName(&dispName);
+        std::wcout << "Name: " << dispName;
+        float vol = -1;
+        pSimpleAudio->GetMasterVolume(&vol);
+        std::cout << "\n Volume: " << vol << "\n\n";
 
 		
-		char cprogname[50] = "";
-		size_t ksjdflaksdjflkdjsf = 20;
-		std::cout << "\n\nSending DATA \n\n";
-		char start[] = "s\n";
-		std::cout << "Start: " << check(sp_blocking_write(tx_port, start, std::strlen(start), 0)) << "\n\n";
-		for (size_t j = 0; j < volumeVector.size(); ++j) {
-			std::string data_send;
-			if (wcstombs_s(&ksjdflaksdjflkdjsf, cprogname, (size_t) 50, volumeVector.at(j).progName, 50) == EINVAL) {
-				std::cout << "ERROR CAN'T COPY\n";
-			}
-			//data_send.append("+,");
-			data_send.append(cprogname);
-			data_send.append("\n");
-			std::cout << "Size: " << data_send.size() << " " << data_send.size() << " Data send: \"" << data_send.c_str() << "\"\n";
-			std::cout << "Bytes: " << check(sp_blocking_write(tx_port, data_send.c_str(), std::strlen(data_send.c_str()), 0)) << "\n";
-		}
-		char end[] = "e\n";
-		std::cout << "End: " << check(sp_blocking_write(tx_port, end, std::strlen(end), 0)) << "\n\n";
-		/*if (wcstombs_s(&ksjdflaksdjflkdjsf, cprogname, (size_t)50, volumeVector.at(volumeVector.size() - 1).progName, 50) == EINVAL) {
-			std::cout << "ERROR CAN'T COPY\n";
-		}
-		data_send.append(cprogname);
-		data_send.append("\n");*/
-		
-		//std::cout << "Size: " << data_send.size() << " " << data_send.size() << " Data send: \"" << data_send.c_str() << "\"\n";
+		SAFE_RELEASE(pSimpleAudio);
+        SAFE_RELEASE(pAudioSessionControl);
 
-		//std::cout << "Bytes: " << check(sp_blocking_write(tx_port, data_send.c_str(), std::strlen(data_send.c_str()), 0)) << "\n";
-		//const char *buf = "HEJnnjnnnnn\n";
-		//std::cout << "Bytes: " << check(sp_blocking_write(tx_port, buf, std::strlen(buf), 0)) << "\n";
-		//std::cout << "Size: " << std::strlen(buf) << " Data send: \"" << buf << "\"\n";
-		//check(sp_drain(tx_port));
-		//check(sp_flush(tx_port, SP_BUF_OUTPUT));
-		//std::cout << check(sp_output_waiting(tx_port)) << "\n";
-		mtx.unlock();
+    }
 
-
-
-		SAFE_RELEASE(pAudioSessionEnumerator);
-
-		tempVolumeVector.clear();
-
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
-}
-
-int main()
-{
-	HRESULT hr = S_OK;
-
-	sp_port* ports;
-
-	check(sp_get_port_by_name("COM4", &ports));
-	check(sp_open(ports, SP_MODE_READ_WRITE));
-
-	check(sp_set_baudrate(ports, 9600));
-	check(sp_set_bits(ports, 8));
-	check(sp_set_parity(ports, SP_PARITY_NONE));
-	check(sp_set_stopbits(ports, 1));
-	check(sp_set_flowcontrol(ports, SP_FLOWCONTROL_NONE));
-
-
-	char* buf = (char*)malloc(20);
-	unsigned int timeout = 0;
-
-	sp_flush(ports, SP_BUF_BOTH);
-
-
-	tx_port = ports;
-	struct sp_port *rx_port = ports;
-
-	std::thread(updater).detach();
-
+    std::cout << "Enumerating through the things\n";
 
 	std::string masterbuf("");
 	while (true)
 	{
 
+        /*
 		int result = check(sp_blocking_read(rx_port, buf, 6, timeout));
 		buf[result] = '\0';
 		masterbuf.append(buf);
 		int rotCW = -1;
 		int index = -1;
-
 
 		while (true) {
 			int searched_index = masterbuf.find("\n");
@@ -316,19 +452,24 @@ int main()
 				break;
 			}
 		}
+    */
 	}
 
 
 	//Clean up----------------------------------------------------------------------------
-	free(buf);
+//	free(buf);
 
-	sp_free_port(ports);
+//	sp_free_port(ports);
 
+    pAudioSessionControl->UnregisterAudioSessionNotification(audiosess);
+	pAudioSessionManager2->UnregisterSessionNotification(notifying);
+	SAFE_RELEASE(pAudioSessionEnumerator);
 	SAFE_RELEASE(pAudioEndPoint);
 	SAFE_RELEASE(pAudioClient);
 	SAFE_RELEASE(pAudioSessionManager);
 	SAFE_RELEASE(pAudioSessionManager2);
 	SAFE_RELEASE(pAudioEndpointVolume);
+	SAFE_RELEASE(notifying);
 	return 0;
 }//END------------------------------------------------------------------------------------
 

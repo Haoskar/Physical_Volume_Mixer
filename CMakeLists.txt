@@ -36,7 +36,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 target_link_libraries(${PROJECT_NAME} PRIVATE "libserialport")
 
 target_link_directories(${PROJECT_NAME} PRIVATE
-    "C:/Users/Oskar/Documents/physical_vol_cmke/include"
+    "C:/Users/Oskar/source/repos/Physical_Volume_Mixer/include"
     )
 
 install(
