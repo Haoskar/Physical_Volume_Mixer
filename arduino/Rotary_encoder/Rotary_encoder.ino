@@ -2,21 +2,16 @@
 
 #define ARRAY_SIZE 10
 
-int pinA_1 = 30; // Connected to CLK Grön
-int pinB_1 = 31; // Connected to DT  Gul
-//int encoderPosCount = 0;
-int pinALast_1;
-//int aVal;
+typedef struct __a{
+  int pinA;
+  int pinB;
+  int pinALast;
+  unsigned long lastTime;
+}RotaryEncoder;
 
+RotaryEncoder rots[3];
 
-int pinA_2 = 32; // Connected to CLK Grön
-int pinB_2 = 33; // Connected to DT  Gul
-int pinALast_2;
-
-int pinA_3 = 34; // Connected to CLK Grön
-int pinB_3 = 35; // Connected to DT  Gul
-int pinALast_3;
-
+const unsigned long ROTARY_ENCODER_DEBOUNCE_DELAY = 6;
 
 //This is to move the array index it sends to the right on the number line ex: array_offset + i
 int button_right = 22;
@@ -45,15 +40,26 @@ int programsSize = 0;
 int displayIndex = 0; //This is what array_offset is displayed right now
 int oldProgramSize = 0;
 
+RotaryEncoder rotary_init(int pinA, int pinB){
+  pinMode(pinA, INPUT);
+  pinMode(pinB, INPUT);
+
+  RotaryEncoder r;
+  r.pinA = pinA;
+  r.pinB = pinB;
+  r.lastTime = 0;
+  r.pinALast = digitalRead(pinA);
+
+  return r;
+}
+
 void setup() {
-  pinMode (pinA_1,INPUT);
-  pinMode (pinB_1,INPUT);
 
-  pinMode (pinA_2,INPUT);
-  pinMode (pinB_2,INPUT);
+  //Rotary Encoders
+  rots[0] = rotary_init(30, 31);
+  rots[1] = rotary_init(32, 33);
+  rots[2] = rotary_init(34, 35);
 
-  pinMode (pinA_3,INPUT);
-  pinMode (pinB_3,INPUT);
 
   pinMode(button_right, INPUT);
   pinMode(button_left, INPUT);
@@ -61,9 +67,6 @@ void setup() {
   /* Read Pin A
   Whatever state it's in will reflect the last position
   */
-  pinALast_1 = digitalRead(pinA_1);
-  pinALast_2 = digitalRead(pinA_2);
-  pinALast_2 = digitalRead(pinA_3);
   Serial.begin (9600);
 
   lcd.begin(16, 2);
@@ -72,14 +75,17 @@ void setup() {
   lcd.setCursor(0, 1); 
   lcd.print("Oskar");
 
-  //Serial.println("STARTING");
 }
 
-void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index, int offset){
+void rotary_encoder_read(RotaryEncoder *r, int index, int offset){
+  if( (r->lastTime - millis()) <= ROTARY_ENCODER_DEBOUNCE_DELAY )
+    return;
+
+
   boolean bCW;
-  int aVal = digitalRead(pinA);
-  if(aVal != *pinALast){
-    if(digitalRead(pinB) != aVal){
+  int aVal = digitalRead(r->pinA);
+  if(aVal != r->pinALast){
+    if(digitalRead(r->pinB) != aVal){
       //Clockwise
       bCW = true;
     }
@@ -88,16 +94,13 @@ void rotary_encoder_read(int pinA, int pinB, int *pinALast, int index, int offse
       bCW = false;      
     }
 
-    //Serial.print("Index: ");
     Serial.print(index + offset);
-    //Serial.print(" Clockwise: ");
-    //Serial.println(bCW ? "True" : "False");
     Serial.print(",");
     Serial.println(bCW);
-
-    delay(6);
+    r->lastTime = millis();
   }
-  *pinALast = aVal;
+  r->pinALast = aVal;
+  
 }
 
 void displayTextOnLCD(){
@@ -137,14 +140,6 @@ void loop(){
   }
   
 
-  /*if(programsSize > 0){
-    lcd.setCursor(0, 0);
-    lcd.print(programs[0]);
-    lcd.setCursor(0, 1);
-    lcd.print(programs[  (programsSize <= 0 ? 0 : programsSize-1)   ]);
-    lcd.setCursor(12, 1);
-    lcd.print(programsSize);
-  }*/
   displayTextOnLCD();
 
   button_left_val = digitalRead(button_left);
@@ -152,11 +147,8 @@ void loop(){
   {
     button_left_prev_val = button_left_val;
     if(array_offset <= 0){
-      //Serial.println("Can't switch left!");
     }else{
-      //Serial.print("Switching left: ");
       array_offset--;
-      //Serial.println(array_offset);
     }
     
   }
@@ -166,41 +158,15 @@ void loop(){
   {
     button_right_prev_val = button_right_val;
     if(array_offset > ARRAY_SIZE){
-      //Serial.println("Can't switch right!");
     }else{
-      //Serial.print("Switching right: ");
       array_offset++;
-      //Serial.println(array_offset);
       
     }
     
   }
 
 
-  rotary_encoder_read(pinA_1, pinB_1, &pinALast_1, 0, 0);
-  rotary_encoder_read(pinA_2, pinB_2, &pinALast_2, 1, array_offset);
-  rotary_encoder_read(pinA_3, pinB_3, &pinALast_3, 2, array_offset);
+  rotary_encoder_read(&rots[0], 0, 0);
+  rotary_encoder_read(&rots[1], 1, array_offset);
+  rotary_encoder_read(&rots[2], 2, array_offset);
 }
-
-/*
-void loop() {
-  aVal = digitalRead(pinA);
-  if (aVal != pinALast){ // Means the knob is rotating
-    // if the knob is rotating, we need to determine direction
-    // We do that by reading pin B.
-    if (digitalRead(pinB) != aVal) { // Means pin A Changed first - We're Rotating Clockwise
-      encoderPosCount ++;
-      bCW = true;
-    } else {// Otherwise B changed first and we're moving CCW
-      bCW = false;
-      encoderPosCount--;
-      }
-    delay(6);
-
-    Serial.print("20,");
-    Serial.println(bCW);
-      //Serial.print("Encoder Position: ");
-      //Serial.println(encoderPosCount);
-  }
-  pinALast = aVal;
-}*/
