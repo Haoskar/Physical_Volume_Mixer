@@ -1,5 +1,8 @@
 // TestVolume_c++.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
+//These two lines are needed for LoadIconMetric for some reason
+#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#pragma comment(lib, "comctl32.lib")
 
 #include <combaseapi.h>
 #include <iostream>
@@ -19,6 +22,10 @@
 #include <string>
 #include <cstring>
 
+
+#include <shellapi.h>
+#include <Windows.h>
+#include <CommCtrl.h>
 
 #include "libserialport.h"
 #include "ProgramVolume.h"
@@ -40,7 +47,7 @@ const IID IID_ISimpleAudioVolume = __uuidof(ISimpleAudioVolume);
 
 HRESULT CreateAudioClient(IMMDevice*, IAudioClient**);
 HRESULT CreateAudioSessionManager(IMMDevice*, IAudioSessionManager**);
-HRESULT getDefaultAudioEndPointDevice(IMMDevice** );
+HRESULT getDefaultAudioEndPointDevice(IMMDevice**);
 void PrintEndpointNames();
 
 int check(enum sp_return result);
@@ -66,7 +73,7 @@ public:
 	std::vector<ProgramVolume*> audioClients;
 
 
-	void add(ProgramVolume *p) {
+	void add(ProgramVolume* p) {
 		audioClients.push_back(p);
 		newClients.push_back(audioClients.size() - 1);
 		updated = true;
@@ -88,7 +95,7 @@ public:
 
 	void cleanupList() {
 		std::vector<ProgramVolume*> toRemove;
-		for (ProgramVolume *p : this->audioClients) {
+		for (ProgramVolume* p : this->audioClients) {
 			bool ret = p->release();
 			if (ret) {
 				updated = true;
@@ -97,11 +104,11 @@ public:
 		}
 
 		std::erase_if(audioClients, [&toRemove](ProgramVolume* p) {
-		for (auto removeP : toRemove)
-		{
-			if (p == removeP) return true;
-		}
-		return false; });
+			for (auto removeP : toRemove)
+			{
+				if (p == removeP) return true;
+			}
+			return false; });
 	}
 };
 
@@ -172,7 +179,7 @@ public:
 		SAFE_RELEASE(pSimpleAudio);
 
 		mtx.lock();
-		ProgramVolume *pv = new ProgramVolume(pNewSession);
+		ProgramVolume* pv = new ProgramVolume(pNewSession);
 		audioClients.add(pv);
 		mtx.unlock();
 
@@ -182,7 +189,7 @@ public:
 
 
 
-int main()
+int MEGAmain()
 {
 	HRESULT hr = S_OK;
 
@@ -203,10 +210,10 @@ int main()
 
 	sp_flush(ports, SP_BUF_BOTH);
 
-    struct sp_port *rx_port = ports;
-    struct sp_port *tx_port = ports;
+	struct sp_port* rx_port = ports;
+	struct sp_port* tx_port = ports;
 
-    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	PRINT_ON_ERROR(hr);
 
 	ISimpleAudioVolume* pSimpleAudio = NULL;
@@ -214,7 +221,7 @@ int main()
 	IAudioSessionControl* pAudioSessionControl = NULL;
 	IAudioSessionControl2* pAudioSessionControl2 = NULL;
 
-    
+
 	hr = getDefaultAudioEndPointDevice(&pAudioEndPoint);
 	PRINT_ON_ERROR(hr);
 	//EXIT_ON_ERROR(hr);
@@ -242,36 +249,36 @@ int main()
 		(void**)&pAudioEndpointVolume
 	);
 
-    std::cout << "Initialized all the things\n";
-
-    
-    AudioNotifications *notifying = new AudioNotifications();
+	std::cout << "Initialized all the things\n";
 
 
-    hr = pAudioSessionManager2->RegisterSessionNotification(notifying);
+	AudioNotifications* notifying = new AudioNotifications();
+
+
+	hr = pAudioSessionManager2->RegisterSessionNotification(notifying);
 	PRINT_ON_ERROR(hr);
 
-    hr = pAudioSessionManager2->GetSessionEnumerator(&pAudioSessionEnumerator);
+	hr = pAudioSessionManager2->GetSessionEnumerator(&pAudioSessionEnumerator);
 	PRINT_ON_ERROR(hr);
 
-    int tempcount = 0;
-    hr = pAudioSessionEnumerator->GetCount(&tempcount);
-    PRINT_ON_ERROR(hr)
+	int tempcount = 0;
+	hr = pAudioSessionEnumerator->GetCount(&tempcount);
+	PRINT_ON_ERROR(hr)
 
-    std::cout << "called the functions\n";
+		std::cout << "called the functions\n";
 	mtx.lock();
-    for (int i = 0; i < tempcount; i++) {
-        hr = pAudioSessionEnumerator->GetSession(i, &pAudioSessionControl);
-        PRINT_ON_ERROR(hr);
+	for (int i = 0; i < tempcount; i++) {
+		hr = pAudioSessionEnumerator->GetSession(i, &pAudioSessionControl);
+		PRINT_ON_ERROR(hr);
 
-		ProgramVolume *pv = new ProgramVolume(pAudioSessionControl);
+		ProgramVolume* pv = new ProgramVolume(pAudioSessionControl);
 
 		audioClients.add(pv);
 
-    }
+	}
 	mtx.unlock();
 
-    std::cout << "Enumerating through the things\n";
+	std::cout << "Enumerating through the things\n";
 
 	std::string masterbuf("");
 	while (true)
@@ -330,7 +337,7 @@ int main()
 
 
 		}
-		
+
 		//Write To USB
 		mtx.lock();
 		if (audioClients.updated) {
@@ -354,12 +361,12 @@ int main()
 
 			char end[] = "e\n";
 			std::cout << "End: " << check(sp_blocking_write(tx_port, end, std::strlen(end), 0)) << "\n\n";
-			
+
 			audioClients.updated = false;
 		}
 
 		//Register new clients
-		
+
 		audioClients.registerNewClients();
 		audioClients.cleanupList();
 
@@ -386,9 +393,103 @@ int main()
 }//END------------------------------------------------------------------------------------
 
 
+LONG APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	RECT rcClient;
+	int i;
+
+	switch (uMsg)
+	{
+	case WM_CREATE: // creating main window  
+		
 
 
+		NOTIFYICONDATAA ndata;
+		ndata.cbSize = sizeof(NOTIFYICONDATAA);
+		ndata.hWnd = hwnd;
+		ndata.uID = 1;
+		ndata.uFlags = NIF_ICON | NIF_TIP;
+		LoadIconMetric(NULL, L"C:\\Users\\Oskar\\source\\repos\\TestVolume\\Icons\\pogcon.ico", LIM_LARGE, &ndata.hIcon);
+		StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Test application");
 
+		Shell_NotifyIcon(NIM_ADD, &ndata);
+		return 0;
+
+		// Process other messages. 
+	}
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+HINSTANCE hinst;
+HWND hwndMain;
+
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
+{
+	MSG msg;
+	BOOL bRet;
+	WNDCLASS wc;
+	UNREFERENCED_PARAMETER(cmdline);
+
+	// Register the window class for the main window. 
+
+	if (!hInstPrev)
+	{
+		wc.style = 0;
+		wc.lpfnWndProc = (WNDPROC)WndProc;
+		wc.cbClsExtra = 0;
+		wc.cbWndExtra = 0;
+		wc.hInstance = hInst;
+		wc.hIcon = LoadIcon((HINSTANCE)NULL,
+			IDI_APPLICATION);
+		wc.hCursor = LoadCursor((HINSTANCE)NULL,
+			IDC_ARROW);
+		wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+		wc.lpszMenuName = "MainMenu";
+		wc.lpszClassName = "MainWndClass";
+
+		if (!RegisterClass(&wc))
+			return FALSE;
+	}
+
+	hinst = hInst;  // save instance handle 
+
+	// Create the main window. 
+
+	hwndMain = CreateWindow("MainWndClass", "Sample",
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+		CW_USEDEFAULT, CW_USEDEFAULT, (HWND)NULL,
+		(HMENU)NULL, hinst, (LPVOID)NULL);
+
+	// If the main window cannot be created, terminate 
+	// the application. 
+
+	if (!hwndMain)
+		return FALSE;
+
+	// Show the window and paint its contents. 
+
+	ShowWindow(hwndMain, 5);
+	UpdateWindow(hwndMain);
+
+	// Start the message loop. 
+
+	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0)
+	{
+		if (bRet == -1)
+		{
+			// handle the error and possibly exit
+		}
+		else
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
+
+	// Return the exit code to the system. 
+
+	return msg.wParam;
+}
 
 
 
