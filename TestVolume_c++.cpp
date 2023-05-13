@@ -397,26 +397,31 @@ LONG APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	RECT rcClient;
 	int i;
+	NOTIFYICONDATAA ndata;
 
 	switch (uMsg)
 	{
-	case WM_CREATE: // creating main window  
+		case WM_CREATE: // creating main window  
+			ndata.cbSize = sizeof(NOTIFYICONDATAA);
+			ndata.hWnd = hwnd;
+			ndata.uID = 1;
+			ndata.uFlags = NIF_TIP;
+			StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Test application");
 		
+			Shell_NotifyIconA(NIM_ADD, &ndata);
+			return 0;
+		
+		case WM_DESTROY:
+			ndata.cbSize = sizeof(NOTIFYICONDATAA);
+			ndata.hWnd = hwnd;
+			ndata.uID = 1;
+		
+			Shell_NotifyIconA(NIM_DELETE, &ndata);
+			PostQuitMessage(WM_QUIT);
+			return 0;
 
-
-		NOTIFYICONDATAA ndata;
-		ndata.cbSize = sizeof(NOTIFYICONDATAA);
-		ndata.hWnd = hwnd;
-		ndata.uID = 1;
-		ndata.uFlags = NIF_ICON | NIF_TIP;
-		LoadIconMetric(NULL, L"C:\\Users\\Oskar\\source\\repos\\TestVolume\\Icons\\pogcon.ico", LIM_LARGE, &ndata.hIcon);
-		StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Test application");
-
-		Shell_NotifyIcon(NIM_ADD, &ndata);
-		return 0;
-
-		// Process other messages. 
 	}
+
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
