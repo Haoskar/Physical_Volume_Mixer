@@ -30,6 +30,8 @@
 #include "libserialport.h"
 #include "ProgramVolume.h"
 
+#include "resource.h"
+
 std::mutex mtx;
 
 
@@ -51,7 +53,7 @@ HRESULT getDefaultAudioEndPointDevice(IMMDevice**);
 void PrintEndpointNames();
 
 int check(enum sp_return result);
-
+int GUIcheck(HWND, enum sp_return);
 
 
 //std::vector<ProgramVolume> volumeVector;
@@ -189,29 +191,26 @@ public:
 
 
 
-int MEGAmain()
+int MEGAmain(HWND hwnd, struct sp_port *port)
 {
 	HRESULT hr = S_OK;
 
-	sp_port* ports;
+	GUIcheck(hwnd, sp_open(port, SP_MODE_READ_WRITE));
 
-	check(sp_get_port_by_name("COM4", &ports));
-	check(sp_open(ports, SP_MODE_READ_WRITE));
-
-	check(sp_set_baudrate(ports, 9600));
-	check(sp_set_bits(ports, 8));
-	check(sp_set_parity(ports, SP_PARITY_NONE));
-	check(sp_set_stopbits(ports, 1));
-	check(sp_set_flowcontrol(ports, SP_FLOWCONTROL_NONE));
+	GUIcheck(hwnd, sp_set_baudrate(port, 9600));
+	GUIcheck(hwnd, sp_set_bits(port, 8));
+	GUIcheck(hwnd, sp_set_parity(port, SP_PARITY_NONE));
+	GUIcheck(hwnd, sp_set_stopbits(port, 1));
+	GUIcheck(hwnd, sp_set_flowcontrol(port, SP_FLOWCONTROL_NONE));
 
 
 	char* buf = (char*)malloc(20);
 	unsigned int timeout = 0;
 
-	sp_flush(ports, SP_BUF_BOTH);
+	sp_flush(port, SP_BUF_BOTH);
 
-	struct sp_port* rx_port = ports;
-	struct sp_port* tx_port = ports;
+	struct sp_port* rx_port = port;
+	struct sp_port* tx_port = port;
 
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	PRINT_ON_ERROR(hr);
@@ -291,14 +290,14 @@ int MEGAmain()
 		int rotCW = -1;
 		int index = -1;
 
-		int searched_index = masterbuf.find("\n");
+		size_t searched_index = masterbuf.find("\n");
 		if (searched_index != -1) {
 			std::string usbmessage = masterbuf.substr(0, searched_index);
 			masterbuf = masterbuf.erase(0, searched_index + 1);
 
 			std::cout << usbmessage << "\n";
 
-			int comsplit = usbmessage.find(",");
+			size_t comsplit = usbmessage.find(",");
 			if (comsplit != -1) {
 				index = stoi(usbmessage.substr(0, comsplit));
 				rotCW = stoi(usbmessage.substr(comsplit + 1, std::string::npos));
@@ -314,9 +313,9 @@ int MEGAmain()
 				float vol = 0;
 				pAudioEndpointVolume->GetMasterVolumeLevelScalar(&vol);
 				if (rotCW)
-					vol = vol + 0.01 < 100 ? vol + 0.01 : vol;
+					vol = vol + 0.01f < 100 ? vol + 0.01f : vol;
 				else
-					vol = vol - 0.01 < 100 ? vol - 0.01 : vol;
+					vol = vol - 0.01f < 100 ? vol - 0.01f : vol;
 				pAudioEndpointVolume->SetMasterVolumeLevelScalar(vol, NULL);
 			}
 			else {
@@ -327,9 +326,9 @@ int MEGAmain()
 					float vol = 0;
 					vol = audioClients.audioClients.at(index)->getVolume();
 					if (rotCW)
-						vol = vol + 0.01 < 100 ? vol + 0.01 : vol;
+						vol = vol + 0.01f < 100 ? vol + 0.01f : vol;
 					else
-						vol = vol - 0.01 < 100 ? vol - 0.01 : vol;
+						vol = vol - 0.01f < 100 ? vol - 0.01f : vol;
 					audioClients.audioClients.at(index)->setVolume(vol);
 				}
 				mtx.unlock();
@@ -379,7 +378,9 @@ int MEGAmain()
 	//Clean up----------------------------------------------------------------------------
 	free(buf);
 
-	sp_free_port(ports);
+	sp_close(port);
+	sp_free_port(port);
+
 
 	pAudioSessionManager2->UnregisterSessionNotification(notifying);
 	SAFE_RELEASE(pAudioSessionEnumerator);
@@ -392,37 +393,254 @@ int MEGAmain()
 	return 0;
 }//END------------------------------------------------------------------------------------
 
+HINSTANCE g_hInst = NULL;
+UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
+BOOL wm_entermenuloop_first = FALSE;
 
-LONG APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+
+//CHANGE THESE PLEASE
+int numPortsInMenu = 0;
+HMENU theShortcutMenu = NULL;
+std::vector<std::string> comPorts;
+std::string selectedItem;
+
+
+LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	RECT rcClient;
-	int i;
-	NOTIFYICONDATAA ndata;
+	//Notification Icon stuffs
+	
+
+	//Menu Command Stuffs
+	int wmId;
+
 
 	switch (uMsg)
 	{
-		case WM_CREATE: // creating main window  
-			ndata.cbSize = sizeof(NOTIFYICONDATAA);
-			ndata.hWnd = hwnd;
-			ndata.uID = 1;
-			ndata.uFlags = NIF_TIP;
-			StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Test application");
-		
-			Shell_NotifyIconA(NIM_ADD, &ndata);
-			return 0;
-		
-		case WM_DESTROY:
-			ndata.cbSize = sizeof(NOTIFYICONDATAA);
-			ndata.hWnd = hwnd;
-			ndata.uID = 1;
-		
-			Shell_NotifyIconA(NIM_DELETE, &ndata);
-			PostQuitMessage(WM_QUIT);
-			return 0;
+	case WM_CREATE: // creating main window  
+	{
+		NOTIFYICONDATAA ndata;
+		ndata.cbSize = sizeof(NOTIFYICONDATAA);
+		ndata.hWnd = hwnd;
+		ndata.uID = 1;
+		ndata.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE | NIF_SHOWTIP;
+		StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Test application");
+		LoadIconMetric(g_hInst, MAKEINTRESOURCEW(IDI_ICON1), LIM_SMALL, &ndata.hIcon);
+		ndata.uCallbackMessage = WMAPP_NOTIFYCALLBACK;
 
+		Shell_NotifyIconA(NIM_ADD, &ndata);
+
+		ndata.uVersion = NOTIFYICON_VERSION_4;
+		return Shell_NotifyIcon(NIM_SETVERSION, &ndata);
 	}
 
-	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+	case WM_COMMAND:
+	{
+
+		wmId = LOWORD(wParam);
+		const int wParamHigh = HIWORD(wParam);
+
+		switch (wmId)
+		{
+		case ID_A_1234:
+			MessageBox(hwnd, "12312312312321321321321321321312321323312321", "Options", MB_OK);
+			break;
+		case ID_A_HEJ:
+			MessageBox(hwnd, "This is from the option in the menu bár", "Options", MB_OK);
+			break;
+		case ID_A_EXIT:
+			DestroyWindow(hwnd);
+			break;
+		default:
+		{
+			if (wmId > ID_WOOOO_ASD && wmId <= (ID_WOOOO_ASD + numPortsInMenu)) {
+				const int menuItemSelected = wmId - ID_WOOOO_ASD - 1;
+				selectedItem = comPorts.at(menuItemSelected);
+
+				//std::string msgString = "I AM A COM PORT AND THIS IS MY NAME:|" + comPorts.at(wmId - ID_WOOOO_ASD - 1) + "|\nnumPortInMenu=" + std::to_string(numPortsInMenu);
+				//MessageBox(hwnd, msgString.c_str(), "Options", MB_OK);
+
+				struct sp_port* port;
+				GUIcheck(hwnd, sp_get_port_by_name(selectedItem.c_str(), &port));
+
+				std::thread mainMessageLoop(MEGAmain, hwnd, port);
+				mainMessageLoop.detach();
+			}
+			else {
+				std::string msgBoxMsg = "I AM A DEFAULT KINDA MAN\nwmId: " + std::to_string(wmId) + "\nwParamHigh: " + std::to_string(wParamHigh);
+				//MessageBox(hwnd, msgBoxMsg.c_str(), "Options", MB_OK);
+				return DefWindowProc(hwnd, uMsg, wParam, lParam);
+			}
+		}
+		}
+	}
+	break;
+
+	//NO WORKY :(
+	//case WM_MENUCOMMAND:
+	//{
+	//	HMENU hMenu = (HMENU) lParam;
+	//	const int pos = wParam;
+
+	//	MENUITEMINFOA menuInfo;
+	//	menuInfo.cbSize = sizeof(MENUITEMINFOA);
+	//	menuInfo.fMask = MIIM_ID | MIIM_TYPE;
+
+	//	GetMenuItemInfoA(hMenu, pos, TRUE, &menuInfo);
+	//	MENUINFO iAmAMenuInfo = { sizeof(MENUINFO), MIM_BACKGROUND | MIM_HELPID | MIM_MAXHEIGHT | MIM_MENUDATA | MIM_STYLE };
+	//	GetMenuInfo(hMenu, &iAmAMenuInfo);
+
+	//	std::string msgBoxMsg = "WM_MENUCOMMAND :)\npos: " + std::to_string(pos) +
+	//		"\nMenu ID: " + std::to_string(menuInfo.wID);// +"\nMy String is: " + menuInfo.dwTypeData;
+	//	MessageBox(hwnd, msgBoxMsg.c_str(), "Options", MB_OK);
+	//break;
+	//}
+	case WM_INITMENUPOPUP:
+	{
+		if (wm_entermenuloop_first == TRUE) {
+			MessageBeep(0xFFFFFFFF);
+			wm_entermenuloop_first = FALSE;
+			break;
+		}
+
+		HMENU hMenu = HMENU(wParam);
+		const int pos = LOWORD(lParam);
+
+		struct sp_port** port_list;
+		sp_list_ports(&port_list);
+
+		const int menuItemCount = GetMenuItemCount(hMenu);
+		
+		comPorts.clear();
+
+		numPortsInMenu = 0;
+		int menuItemIndex = 0;
+		for (; port_list[menuItemIndex] != NULL; menuItemIndex++, numPortsInMenu++)
+		{
+
+			MENUITEMINFOA mItem;
+			mItem.cbSize = sizeof(MENUITEMINFOA);
+			mItem.fMask = MIIM_TYPE | MIIM_ID | MIIM_CHECKMARKS | MIIM_STATE;
+			mItem.hbmpChecked = NULL;
+			mItem.hbmpUnchecked = NULL;
+			mItem.fType = MFT_STRING;
+			mItem.wID = ID_WOOOO_ASD + 1 + menuItemIndex;
+			mItem.fState = MFS_ENABLED;
+
+			std::string p_name = "UNKNOWN NAME";
+
+			struct sp_port* port = port_list[menuItemIndex];
+			
+			char* port_name = sp_get_port_name(port);
+			if (port_name != NULL)
+			{
+				p_name = port_name;
+			}
+
+			comPorts.push_back(p_name);
+
+
+			if (selectedItem.compare(p_name) == 0)
+				mItem.fState |= MFS_CHECKED;
+
+			char* port_desc = sp_get_port_description(port);
+			if (port_desc != NULL) {
+				p_name += " | ";
+				p_name += port_desc;
+			}
+			
+			mItem.dwTypeData = LPTSTR(p_name.c_str());
+			mItem.cch = std::strlen(p_name.c_str());
+
+			//Modify the item that already exists or if there does not exist an item add one
+			if (menuItemIndex < menuItemCount)
+				SetMenuItemInfoA(hMenu, menuItemIndex, TRUE, &mItem);
+				//ModifyMenu(hMenu, menuItemIndex, MF_BYPOSITION | MF_STRING, ID_WOOOO_ASD + 1 + menuItemIndex, p_name.c_str());
+			else
+				InsertMenuItemA(hMenu, menuItemIndex, TRUE, &mItem);
+				//AppendMenu(hMenu, MF_STRING, ID_WOOOO_ASD + 1 + menuItemIndex, p_name.c_str());
+		}
+
+		//If there are any items left after adding all the COM ports delete them
+		for (; menuItemIndex < menuItemCount; menuItemIndex++) {
+			DeleteMenu(hMenu, menuItemIndex, MF_BYPOSITION);
+		}
+
+		sp_free_port_list(port_list);
+		
+	}
+	break;
+
+	case WM_ENTERMENULOOP:
+	{
+		wm_entermenuloop_first = TRUE;
+		if (wParam)
+			break;
+
+		MessageBox(hwnd, "I AM IN A LOOOOOOOOOOOOOOOOOOOOOOOP", "Options", MB_OK);
+		break;
+	}
+	break;
+
+	case WMAPP_NOTIFYCALLBACK:
+		switch (LOWORD(lParam))
+		{
+		case WM_CONTEXTMENU:
+		{
+			POINT const pt = { LOWORD(wParam), HIWORD(wParam) };
+
+			HMENU hMenu = LoadMenu(g_hInst, MAKEINTRESOURCEA(IDR_MENU1));
+			if (hMenu)
+			{
+				
+				HMENU hSubMenu = GetSubMenu(hMenu, 0);
+				theShortcutMenu = hSubMenu;
+				if (hSubMenu)
+				{
+
+					SetForegroundWindow(hwnd);
+
+
+					UINT uFlags = TPM_RIGHTBUTTON;
+					if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0)
+					{
+						uFlags |= TPM_RIGHTALIGN;
+					}
+					else
+					{
+						uFlags |= TPM_LEFTALIGN;
+					}
+
+					
+					//MENUINFO mInfo;
+					//mInfo.cbSize = sizeof(MENUINFO);
+					//mInfo.fMask = MIM_STYLE;
+					//mInfo.dwStyle = MNS_NOTIFYBYPOS;
+					//SetMenuInfo(hSubMenu, &mInfo);
+
+					TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hwnd, NULL);
+				}
+				DestroyMenu(hMenu);
+			}
+		}
+		}
+		break;
+
+	case WM_DESTROY:
+	{
+		NOTIFYICONDATAA ndata;
+		ndata.cbSize = sizeof(NOTIFYICONDATAA);
+		ndata.hWnd = hwnd;
+		ndata.uID = 1;
+
+		Shell_NotifyIconA(NIM_DELETE, &ndata);
+		PostQuitMessage(WM_QUIT);
+	}
+	break;
+	default:
+		return DefWindowProc(hwnd, uMsg, wParam, lParam);
+	}
+
+	return 0;
 }
 
 HINSTANCE hinst;
@@ -473,7 +691,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 	// Show the window and paint its contents. 
 
-	ShowWindow(hwndMain, 5);
+	//ShowWindow(hwndMain, 5);
 	UpdateWindow(hwndMain);
 
 	// Start the message loop. 
@@ -767,4 +985,30 @@ int check(enum sp_return result)
 	default:
 		return result;
 	}
+}
+
+/* Helper function for error handling. */
+int GUIcheck(HWND hwnd, enum sp_return result)
+{
+	/* For this example we'll just exit on any error by calling abort(). */
+	char* error_message;
+
+	switch (result) {
+	case SP_ERR_ARG:
+		MessageBox(hwnd, "Error: Invalid argument.", "ERROR", MB_OK | MB_ICONERROR);
+		abort();
+	case SP_ERR_FAIL:
+		error_message = sp_last_error_message();
+		printf("Error: Failed: %s\n", error_message);
+		MessageBox(hwnd, (std::string("Error: Failed: ") + std::string(error_message)).c_str(), "ERROR", MB_OK | MB_ICONERROR);
+		sp_free_error_message(error_message);
+		break;
+	case SP_ERR_SUPP:
+		MessageBox(hwnd, "Error: Not supported.", "ERROR", MB_OK | MB_ICONERROR);
+		abort();
+	case SP_ERR_MEM:
+		MessageBox(hwnd, "Error: Couldn't allocate memory.", "ERROR", MB_OK | MB_ICONERROR);
+		abort();
+	}
+	return result;
 }

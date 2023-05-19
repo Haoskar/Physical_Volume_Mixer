@@ -9,17 +9,26 @@ typedef struct __a{
   unsigned long lastTime;
 }RotaryEncoder;
 
+//Constants
+const int PIN_A_1 = 30;
+const int PIN_B_1 = 31;
+
+const int PIN_A_2 = 38;
+const int PIN_B_2 = 39;
+
+const int PIN_A_3 = 50;
+const int PIN_B_3 = 51;
 RotaryEncoder rots[3];
 
 const unsigned long ROTARY_ENCODER_DEBOUNCE_DELAY = 6;
 
 //This is to move the array index it sends to the right on the number line ex: array_offset + i
-int button_right = 22;
+int button_right = 35;
 int button_right_val = 0;
 int button_right_prev_val = -1;
 
 //This is to move the array index it sends to the left on the number line ex: array_offset + i
-int button_left = 24;
+int button_left = 47;
 int button_left_val = 0;
 int button_left_prev_val = -1;
 
@@ -56,9 +65,9 @@ RotaryEncoder rotary_init(int pinA, int pinB){
 void setup() {
 
   //Rotary Encoders
-  rots[0] = rotary_init(30, 31);
-  rots[1] = rotary_init(32, 33);
-  rots[2] = rotary_init(34, 35);
+  rots[0] = rotary_init(PIN_A_1, PIN_B_1);
+  rots[1] = rotary_init(PIN_A_2, PIN_B_2);
+  rots[2] = rotary_init(PIN_A_3, PIN_B_3);
 
 
   pinMode(button_right, INPUT);
