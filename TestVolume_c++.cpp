@@ -33,7 +33,8 @@
 #include "resource.h"
 
 std::mutex mtx;
-
+std::atomic<boolean> main_program_loop = false;
+std::thread *main_thread = nullptr;
 
 #define EXIT_ON_ERROR(hres)  \
               if (FAILED(hres)) { goto Exit; }
@@ -280,7 +281,7 @@ int MEGAmain(HWND hwnd, struct sp_port *port)
 	std::cout << "Enumerating through the things\n";
 
 	std::string masterbuf("");
-	while (true)
+	while (main_program_loop)
 	{
 
 		//Read from USB
@@ -337,35 +338,35 @@ int MEGAmain(HWND hwnd, struct sp_port *port)
 
 		}
 
-		//Write To USB
-		mtx.lock();
-		if (audioClients.updated) {
-			char cprogname[50] = "";
-			size_t ksjdflaksdjflkdjsf = 20;
-			std::cout << "\n\nSending DATA \n\n";
-			char start[] = "s\n";
-			std::cout << "Start: " << check(sp_blocking_write(tx_port, start, std::strlen(start), 0)) << "\n\n";
+		////Write To USB
+		//mtx.lock();
+		//if (audioClients.updated) {
+		//	char cprogname[50] = "";
+		//	size_t ksjdflaksdjflkdjsf = 20;
+		//	std::cout << "\n\nSending DATA \n\n";
+		//	char start[] = "s\n";
+		//	std::cout << "Start: " << check(sp_blocking_write(tx_port, start, std::strlen(start), 0)) << "\n\n";
 
-			for (size_t j = 0; j < audioClients.audioClients.size(); ++j) {
-				std::string data_send;
-				if (wcstombs_s(&ksjdflaksdjflkdjsf, cprogname, (size_t)50, audioClients.audioClients.at(j)->display_name.c_str(), 50) == EINVAL) {
-					std::cout << "ERROR CAN'T COPY\n";
-				}
-				//data_send.append("+,");
-				data_send.append(cprogname);
-				data_send.append("\n");
-				std::cout << "Size: " << data_send.size() << " " << data_send.size() << " Data send: \"" << data_send.c_str() << "\"\n";
-				std::cout << "Bytes: " << check(sp_blocking_write(tx_port, data_send.c_str(), std::strlen(data_send.c_str()), 0)) << "\n";
-			}
+		//	for (size_t j = 0; j < audioClients.audioClients.size(); ++j) {
+		//		std::string data_send;
+		//		if (wcstombs_s(&ksjdflaksdjflkdjsf, cprogname, (size_t)50, audioClients.audioClients.at(j)->display_name.c_str(), 50) == EINVAL) {
+		//			std::cout << "ERROR CAN'T COPY\n";
+		//		}
+		//		//data_send.append("+,");
+		//		data_send.append(cprogname);
+		//		data_send.append("\n");
+		//		std::cout << "Size: " << data_send.size() << " " << data_send.size() << " Data send: \"" << data_send.c_str() << "\"\n";
+		//		std::cout << "Bytes: " << check(sp_blocking_write(tx_port, data_send.c_str(), std::strlen(data_send.c_str()), 0)) << "\n";
+		//	}
 
-			char end[] = "e\n";
-			std::cout << "End: " << check(sp_blocking_write(tx_port, end, std::strlen(end), 0)) << "\n\n";
+		//	char end[] = "e\n";
+		//	std::cout << "End: " << check(sp_blocking_write(tx_port, end, std::strlen(end), 0)) << "\n\n";
 
-			audioClients.updated = false;
-		}
+		//	audioClients.updated = false;
+		//}
 
 		//Register new clients
-
+		mtx.lock();
 		audioClients.registerNewClients();
 		audioClients.cleanupList();
 
@@ -407,9 +408,7 @@ std::string selectedItem;
 
 LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	//Notification Icon stuffs
-	
-
+	HRESULT hr = S_OK;
 	//Menu Command Stuffs
 	int wmId;
 
@@ -423,8 +422,8 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		ndata.hWnd = hwnd;
 		ndata.uID = 1;
 		ndata.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE | NIF_SHOWTIP;
-		StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Test application");
-		LoadIconMetric(g_hInst, MAKEINTRESOURCEW(IDI_ICON1), LIM_SMALL, &ndata.hIcon);
+		StringCchCopy(ndata.szTip, ARRAYSIZE(ndata.szTip), "Physical Volume Control");
+		hr = LoadIconMetric(g_hInst, MAKEINTRESOURCEW(IDI_ICON2), LIM_LARGE, &ndata.hIcon);
 		ndata.uCallbackMessage = WMAPP_NOTIFYCALLBACK;
 
 		Shell_NotifyIconA(NIM_ADD, &ndata);
@@ -441,12 +440,6 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		switch (wmId)
 		{
-		case ID_A_1234:
-			MessageBox(hwnd, "12312312312321321321321321321312321323312321", "Options", MB_OK);
-			break;
-		case ID_A_HEJ:
-			MessageBox(hwnd, "This is from the option in the menu bár", "Options", MB_OK);
-			break;
 		case ID_A_EXIT:
 			DestroyWindow(hwnd);
 			break;
@@ -456,44 +449,26 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				const int menuItemSelected = wmId - ID_WOOOO_ASD - 1;
 				selectedItem = comPorts.at(menuItemSelected);
 
-				//std::string msgString = "I AM A COM PORT AND THIS IS MY NAME:|" + comPorts.at(wmId - ID_WOOOO_ASD - 1) + "|\nnumPortInMenu=" + std::to_string(numPortsInMenu);
-				//MessageBox(hwnd, msgString.c_str(), "Options", MB_OK);
-
 				struct sp_port* port;
 				GUIcheck(hwnd, sp_get_port_by_name(selectedItem.c_str(), &port));
 
-				std::thread mainMessageLoop(MEGAmain, hwnd, port);
-				mainMessageLoop.detach();
+				main_program_loop = false;
+				if (main_thread != nullptr) {
+					main_thread->join();
+					delete main_thread;
+				}
+				
+
+				main_program_loop = true;
+				main_thread = new std::thread(MEGAmain, hwnd, port);
 			}
 			else {
-				std::string msgBoxMsg = "I AM A DEFAULT KINDA MAN\nwmId: " + std::to_string(wmId) + "\nwParamHigh: " + std::to_string(wParamHigh);
-				//MessageBox(hwnd, msgBoxMsg.c_str(), "Options", MB_OK);
 				return DefWindowProc(hwnd, uMsg, wParam, lParam);
 			}
 		}
 		}
 	}
 	break;
-
-	//NO WORKY :(
-	//case WM_MENUCOMMAND:
-	//{
-	//	HMENU hMenu = (HMENU) lParam;
-	//	const int pos = wParam;
-
-	//	MENUITEMINFOA menuInfo;
-	//	menuInfo.cbSize = sizeof(MENUITEMINFOA);
-	//	menuInfo.fMask = MIIM_ID | MIIM_TYPE;
-
-	//	GetMenuItemInfoA(hMenu, pos, TRUE, &menuInfo);
-	//	MENUINFO iAmAMenuInfo = { sizeof(MENUINFO), MIM_BACKGROUND | MIM_HELPID | MIM_MAXHEIGHT | MIM_MENUDATA | MIM_STYLE };
-	//	GetMenuInfo(hMenu, &iAmAMenuInfo);
-
-	//	std::string msgBoxMsg = "WM_MENUCOMMAND :)\npos: " + std::to_string(pos) +
-	//		"\nMenu ID: " + std::to_string(menuInfo.wID);// +"\nMy String is: " + menuInfo.dwTypeData;
-	//	MessageBox(hwnd, msgBoxMsg.c_str(), "Options", MB_OK);
-	//break;
-	//}
 	case WM_INITMENUPOPUP:
 	{
 		if (wm_entermenuloop_first == TRUE) {
@@ -554,10 +529,8 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//Modify the item that already exists or if there does not exist an item add one
 			if (menuItemIndex < menuItemCount)
 				SetMenuItemInfoA(hMenu, menuItemIndex, TRUE, &mItem);
-				//ModifyMenu(hMenu, menuItemIndex, MF_BYPOSITION | MF_STRING, ID_WOOOO_ASD + 1 + menuItemIndex, p_name.c_str());
 			else
 				InsertMenuItemA(hMenu, menuItemIndex, TRUE, &mItem);
-				//AppendMenu(hMenu, MF_STRING, ID_WOOOO_ASD + 1 + menuItemIndex, p_name.c_str());
 		}
 
 		//If there are any items left after adding all the COM ports delete them
@@ -573,10 +546,6 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_ENTERMENULOOP:
 	{
 		wm_entermenuloop_first = TRUE;
-		if (wParam)
-			break;
-
-		MessageBox(hwnd, "I AM IN A LOOOOOOOOOOOOOOOOOOOOOOOP", "Options", MB_OK);
 		break;
 	}
 	break;
@@ -610,13 +579,6 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						uFlags |= TPM_LEFTALIGN;
 					}
 
-					
-					//MENUINFO mInfo;
-					//mInfo.cbSize = sizeof(MENUINFO);
-					//mInfo.fMask = MIM_STYLE;
-					//mInfo.dwStyle = MNS_NOTIFYBYPOS;
-					//SetMenuInfo(hSubMenu, &mInfo);
-
 					TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hwnd, NULL);
 				}
 				DestroyMenu(hMenu);
@@ -631,6 +593,12 @@ LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		ndata.cbSize = sizeof(NOTIFYICONDATAA);
 		ndata.hWnd = hwnd;
 		ndata.uID = 1;
+
+		main_program_loop = false;
+		if (main_thread != nullptr) {
+			main_thread->join();
+			delete main_thread;
+		}
 
 		Shell_NotifyIconA(NIM_DELETE, &ndata);
 		PostQuitMessage(WM_QUIT);
@@ -674,7 +642,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			return FALSE;
 	}
 
-	hinst = hInst;  // save instance handle 
+	g_hInst = hInst;  // save instance handle 
 
 	// Create the main window. 
 
