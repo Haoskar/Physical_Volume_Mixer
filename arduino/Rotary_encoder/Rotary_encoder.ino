@@ -39,15 +39,15 @@ const unsigned long debounceDelay = 800;    // the debounce time; increase if th
 
 int array_offset = 0;
 
-const int RS = 4, EN = 5, D4 = 10, D5 = 11, D6 = 12, D7 = 13;
-LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
+//const int RS = 4, EN = 5, D4 = 10, D5 = 11, D6 = 12, D7 = 13;
+//LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 
-String programs[100]; 
-int programsSize = 0;
-
-int displayIndex = 0; //This is what array_offset is displayed right now
-int oldProgramSize = 0;
+//String programs[100]; 
+//int programsSize = 0;
+//
+//int displayIndex = 0; //This is what array_offset is displayed right now
+//int oldProgramSize = 0;
 
 RotaryEncoder rotary_init(int pinA, int pinB){
   pinMode(pinA, INPUT);
@@ -78,11 +78,14 @@ void setup() {
   */
   Serial.begin (9600);
 
-  lcd.begin(16, 2);
-  lcd.setCursor(0, 0);
-  lcd.print("Hello World!");
-  lcd.setCursor(0, 1); 
-  lcd.print("Oskar");
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
+  //lcd.begin(16, 2);
+  //lcd.setCursor(0, 0);
+  //lcd.print("Hello World!");
+  //lcd.setCursor(0, 1); 
+  //lcd.print("Oskar");
 
 }
 
@@ -112,44 +115,44 @@ void rotary_encoder_read(RotaryEncoder *r, int index, int offset){
   
 }
 
-void displayTextOnLCD(){
-  //do not update unless something has changed!
-  if(displayIndex == array_offset && programsSize == oldProgramSize)
-    return;
-  //something changed updating
-  lcd.clear();
-  for(int i = 0; i < 2; i++){
-    lcd.setCursor(0, i);
-    displayIndex = array_offset;
-    oldProgramSize = programsSize;
-    if(i + array_offset >= programsSize || i + array_offset < 0){
-      lcd.print("NOTHING");
-    }
-    else{
-      lcd.print(programs[i + array_offset]);      
-    }
-  }
-}
+//void displayTextOnLCD(){
+//  //do not update unless something has changed!
+//  if(displayIndex == array_offset && programsSize == oldProgramSize)
+//    return;
+//  //something changed updating
+//  lcd.clear();
+//  for(int i = 0; i < 2; i++){
+//    lcd.setCursor(0, i);
+//    displayIndex = array_offset;
+//    oldProgramSize = programsSize;
+//    if(i + array_offset >= programsSize || i + array_offset < 0){
+//      lcd.print("NOTHING");
+//    }
+//    else{
+//      lcd.print(programs[i + array_offset]);      
+//    }
+//  }
+//}
 
 void loop(){
   
   
-  while(Serial.available() > 0){
-    String a = Serial.readStringUntil('\n');
-
-    if(a.compareTo(String("s")) == 0){
-      programsSize = 0;
-      continue;
-    }
-    else if(a.compareTo(String("e")) == 0){
-      break;
-    }    
-    programs[programsSize] = a;
-    programsSize++;
-  }
+  //while(Serial.available() > 0){
+  //  String a = Serial.readStringUntil('\n');
+//
+  //  if(a.compareTo(String("s")) == 0){
+  //    programsSize = 0;
+  //    continue;
+  //  }
+  //  else if(a.compareTo(String("e")) == 0){
+  //    break;
+  //  }    
+  //  programs[programsSize] = a;
+  //  programsSize++;
+  //}
   
 
-  displayTextOnLCD();
+  //displayTextOnLCD();
 
   button_left_val = digitalRead(button_left);
   if(button_left_val != button_left_prev_val && (button_left_lastDebounceTime - millis()) > debounceDelay)
